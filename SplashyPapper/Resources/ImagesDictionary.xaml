@@ -1,0 +1,7 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:SplashyPapper.Resources">
+    <BitmapImage UriSource="/Assets/temp1.jpg" x:Key="TempImage1"></BitmapImage>
+    <BitmapImage UriSource="/Assets/temp2.jpg" x:Key="TempImage2"></BitmapImage>
+</ResourceDictionary>

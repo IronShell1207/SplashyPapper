@@ -1,0 +1,10 @@
+﻿{
+    "profiles": {
+      "SplashyPapper (Package)": {
+        "commandName": "MsixPackage"
+      },
+      "SplashyPapper (Unpackaged)": {
+        "commandName": "Project"
+      }
+    }
+}
