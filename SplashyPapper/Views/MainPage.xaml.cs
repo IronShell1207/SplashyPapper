@@ -27,8 +27,35 @@ public sealed partial class MainPage : Page
         App.MainWindow.ExtendsContentIntoTitleBar = true;
         App.MainWindow.SetTitleBar(AppTitleBar);
         ViewModel.SelectedImageChanged += ViewModel_SelectedImageChanged;
-        PointerMoved += MainPage_OnPointerMoved;
+
+        ViewModel.GalleryAlwaysStateChanged += ViewModel_GalleryAlwaysStateChanged;
+
+        if (!ViewModel.IsAlwaysShowGallery)
+            PointerMoved += MainPage_GalleryVisibilityChanger_OnPointerMoved;
+
         ToastService.ToastRequested += ToastService_ToastRequested;
+
+        PointerMoved += MainPage_PointerMoved;
+    }
+
+    private bool IsCursorAtBottom { get; set; } = false;
+
+    private void MainPage_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        IsCursorAtBottom = CheckPositionIsBottom(e);
+    }
+
+    private void ViewModel_GalleryAlwaysStateChanged(bool obj)
+    {
+        if (obj)
+        {
+            PointerMoved += MainPage_GalleryVisibilityChanger_OnPointerMoved;
+        }
+        else
+        {
+            GalleryGrid.Visibility = Visibility.Visible;
+            PointerMoved -= MainPage_GalleryVisibilityChanger_OnPointerMoved;
+        }
     }
 
     private async void ToastService_ToastRequested(ToastService obj)
@@ -115,52 +142,47 @@ public sealed partial class MainPage : Page
         }
     }
 
-    private void MainPage_OnSizeChanged(object sender, SizeChangedEventArgs e)
-    {
-    }
-
-    private void Selector_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-    }
-
     private void SearchButton_OnClick(object sender, RoutedEventArgs e)
     {
         DialogsFrame.Visibility = Visibility.Visible;
         DialogsFrame.Navigate(typeof(SearchWindow), ViewModel);
     }
 
-    private bool GalleryVisibilityChanging
-    {
-        get;
-        set;
-    } = false;
+    private bool GalleryShowing { get; set; } = true;
 
-    private async void MainPage_OnPointerMoved(object sender, PointerRoutedEventArgs e)
+    private async void MainPage_GalleryVisibilityChanger_OnPointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        bool isAtBottom = CheckPositionIsBottom(e);
-        if (isAtBottom)
+        if (ViewModel.IsAlwaysShowGallery)
         {
-            if (!GalleryVisibilityChanging)
-            {
-                GalleryVisibilityChanging = true;
-
-                await Task.Delay(100);
-                GalleryGrid.Visibility = Visibility.Visible;
-                GalleryVisibilityChanging = false;
-            }
+            GalleryGrid.Visibility = Visibility.Visible;
+            PointerMoved -= MainPage_GalleryVisibilityChanger_OnPointerMoved;
         }
-        else
+        bool isAtBottom = CheckPositionIsBottom(e);
+        if (isAtBottom && !GalleryShowing)
         {
-            if (!GalleryVisibilityChanging)
-            {
-                GalleryVisibilityChanging = true;
-                await Task.Delay(1300);
-                if (!isAtBottom)
-                    GalleryGrid.Visibility = Visibility.Collapsed;
-                GalleryVisibilityChanging = false;
-            }
+            GalleryGrid.Visibility = Visibility.Visible;
+            GalleryShowing = true;
+        }
+        else if (!_galleryHideTimer?.IsEnabled == true)
+        {
+            _galleryHideTimer = new DispatcherTimer();
+            _galleryHideTimer.Interval = TimeSpan.FromMilliseconds(1200);
+            _galleryHideTimer.Tick += _galleryHideTimer_Tick;
+            _galleryHideTimer.Start();
         }
     }
+
+    private void _galleryHideTimer_Tick(object? sender, object e)
+    {
+        if (!IsCursorAtBottom)
+        {
+            GalleryGrid.Visibility = Visibility.Collapsed;
+            _galleryHideTimer.Stop();
+            _galleryHideTimer.Tick -= _galleryHideTimer_Tick;
+        }
+    }
+
+    private DispatcherTimer _galleryHideTimer;
 
     private bool CheckPositionIsBottom(PointerRoutedEventArgs e)
     {
@@ -171,5 +193,11 @@ public sealed partial class MainPage : Page
         }
 
         return false;
+    }
+
+    private void SettingsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        DialogsFrame.Visibility = Visibility.Visible;
+        DialogsFrame.Navigate(typeof(SettingsPage), ViewModel);
     }
 }

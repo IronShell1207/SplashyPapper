@@ -10,6 +10,7 @@ using Microsoft.Extensions.Primitives;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using RestSharp;
+using SplashyPapper.Constants;
 using SplashyPapper.Core.Constants;
 using SplashyPapper.Core.Services;
 using SplashyPapper.Helpers;
@@ -28,6 +29,33 @@ public class MainViewModel : ObservableRecipient
         {
             SetProperty(ref _isLoading, value);
             DownloadMoreCommand?.NotifyCanExecuteChanged();
+        }
+    }
+
+    private bool _isCancelTipVisible = false;
+
+    public bool IsCancelTipVisible
+    {
+        get => _isCancelTipVisible;
+        set
+        {
+            SetProperty(ref _isCancelTipVisible, value);
+            LocalSettingsHelper.SaveValue(SettingsName.CANCEL_TIP_SHOWED, true);
+        }
+    }
+
+    private bool _isAlwaysShowGallery = false;
+
+    public event Action<bool> GalleryAlwaysStateChanged;
+
+    public bool IsAlwaysShowGallery
+    {
+        get => _isAlwaysShowGallery;
+        set
+        {
+            SetProperty(ref _isAlwaysShowGallery, value);
+            LocalSettingsHelper.SaveValue(SettingsName.ALWAYS_SHOW_GALLERY, value);
+            GalleryAlwaysStateChanged?.Invoke(value);
         }
     }
 
@@ -84,35 +112,44 @@ public class MainViewModel : ObservableRecipient
 
     public async void LoadPicture()
     {
-        IsLoading = true;
-        CancellationToken = new CancellationTokenSource();
-        CancelCommand.NotifyCanExecuteChanged();
-        string link = "https://source.unsplash.com/random/" + Resolutions[SelectedResolution] + "?" + KeyWords;
-        var httpClient = new HttpClient();
-        httpClient.Timeout = TimeSpan.FromSeconds(25);
-        try
+        if (!IsLoading)
         {
-            var response = await httpClient.GetAsync(link, CancellationToken.Token);
+            IsLoading = true;
+            if (!LocalSettingsHelper.IsCancelTipShowed) IsCancelTipVisible = true;
+            CancellationToken = new CancellationTokenSource();
             CancelCommand.NotifyCanExecuteChanged();
-            var imagesFolder = await GetPicsFolder();
-            await using var responseStream = await response.Content.ReadAsStreamAsync();
-            var memoryStream = new MemoryStream();
-            await responseStream.CopyToAsync(memoryStream);
-            await imagesFolder.WriteBytesToFileAsync(memoryStream.ToArray(),
-                "image_" + DateTime.Now.ToString("MM-dd-yy_hh-mm-ss") + ".jpg",
-                CreationCollisionOption.GenerateUniqueName);
+            string link = "https://source.unsplash.com/random/" + Resolutions[SelectedResolution] + "?" + KeyWords;
+            var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(DownloadTimeout);
+            try
+            {
+                var response = await httpClient.GetAsync(link, CancellationToken.Token);
+                CancelCommand.NotifyCanExecuteChanged();
+                var imagesFolder = await GetPicsFolder();
+                await using var responseStream = await response.Content.ReadAsStreamAsync();
+                var memoryStream = new MemoryStream();
+                await responseStream.CopyToAsync(memoryStream);
+                await imagesFolder.WriteBytesToFileAsync(memoryStream.ToArray(),
+                    "image_" + DateTime.Now.ToString("MM-dd-yy_hh-mm-ss") + ".jpg",
+                    CreationCollisionOption.GenerateUniqueName);
 
-            await LoadAllPictures();
+                await LoadAllPictures();
+            }
+            catch (TaskCanceledException ex)
+            {
+                var toast = new ToastService($"Can't download picture! {ex.Message}", TimeSpan.FromSeconds(5));
+                toast.RequestToast();
+            }
+
+            CancellationToken = null;
+            CancelCommand.NotifyCanExecuteChanged();
+            IsLoading = false;
         }
-        catch (TaskCanceledException ex)
+        else
         {
-            var toast = new ToastService($"Can't download picture! {ex.Message}", TimeSpan.FromSeconds(5));
+            var toast = new ToastService($"Download already started", TimeSpan.FromSeconds(3));
             toast.RequestToast();
         }
-
-        CancellationToken = null;
-        CancelCommand.NotifyCanExecuteChanged();
-        IsLoading = false;
     }
 
     #region DownloadMoreCommand
@@ -136,6 +173,30 @@ public class MainViewModel : ObservableRecipient
 
         IsLoading = false;
         return await folder.GetFolderAsync("Images");
+    }
+
+    public int _downloadTimeout = 25;
+
+    public int DownloadTimeout
+    {
+        get => _downloadTimeout;
+        set
+        {
+            SetProperty(ref _downloadTimeout, value);
+            LocalSettingsHelper.SaveValue(SettingsName.TIMEOUT_DURATION, value);
+        }
+    }
+
+    public bool _autoLoadNext = true;
+
+    public bool AutoLoadNext
+    {
+        get => _autoLoadNext;
+        set
+        {
+            SetProperty(ref _autoLoadNext, value);
+            LocalSettingsHelper.SaveValue(SettingsName.AUTO_LOAD_NEXT, value);
+        }
     }
 
     public RelayCommand CancelCommand
@@ -189,11 +250,27 @@ public class MainViewModel : ObservableRecipient
         DownloadMoreCommand = new RelayCommand(LoadPicture, CanDownloadMoreExecute);
 
         SelectedImageChanged += MainViewModel_SelectedImageChanged;
+        LoadSettings();
+    }
+
+    private void LoadSettings()
+    {
+        var autoLoadValue = LocalSettingsHelper.TryGetValue(SettingsName.AUTO_LOAD_NEXT);
+        if (autoLoadValue != null) AutoLoadNext = (bool)autoLoadValue;
+
+        var keyWordsValue = LocalSettingsHelper.TryGetValue(SettingsName.KEY_WORDS);
+        if (keyWordsValue != null) KeyWords = (string)keyWordsValue;
+
+        var timeoutValue = LocalSettingsHelper.TryGetValue(SettingsName.TIMEOUT_DURATION);
+        if (timeoutValue != null) DownloadTimeout = (int)timeoutValue;
+
+        var resolutionIdValue = LocalSettingsHelper.TryGetValue(SettingsName.SELECTED_RESOLUTION_ID);
+        if (resolutionIdValue != null) SelectedResolution = (int)resolutionIdValue;
     }
 
     private void MainViewModel_SelectedImageChanged(int obj)
     {
-        if (obj + 1 >= Images.Count)
+        if (AutoLoadNext && obj + 1 >= Images.Count)
         {
             LoadPicture();
         }
@@ -208,7 +285,11 @@ public class MainViewModel : ObservableRecipient
     public int SelectedResolution
     {
         get => _selectedResolution;
-        set => SetProperty(ref _selectedResolution, value);
+        set
+        {
+            SetProperty(ref _selectedResolution, value);
+            LocalSettingsHelper.SaveValue(SettingsName.SELECTED_RESOLUTION_ID, value);
+        }
     }
 
     #region SetWallpaperCommand
@@ -221,6 +302,8 @@ public class MainViewModel : ObservableRecipient
     private async void OnSetWallpaperCommandExecuting()
     {
         WallpaperChanger.Set(Images[SelectedPictureIndex].Path, WallpaperChanger.Style.Stretched);
+        var toast = new ToastService($"Wallpaper have been changed!", TimeSpan.FromSeconds(3));
+        toast.RequestToast();
     }
 
     #endregion SetWallpaperCommand
@@ -238,6 +321,10 @@ public class MainViewModel : ObservableRecipient
     public string KeyWords
     {
         get => _keyWords;
-        set => SetProperty(ref _keyWords, value);
+        set
+        {
+            SetProperty(ref _keyWords, value);
+            LocalSettingsHelper.SaveValue(SettingsName.KEY_WORDS, value);
+        }
     }
 }

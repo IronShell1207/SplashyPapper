@@ -10,7 +10,6 @@
     xmlns:storage="using:Windows.Storage"
     Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
     RequestedTheme="Dark"
-    SizeChanged="MainPage_OnSizeChanged"
     mc:Ignorable="d">
 
     <Grid>
@@ -108,7 +107,7 @@
                         <Setter Property="Background" Value="Transparent"></Setter>
                     </Style>
                 </Grid.Resources>
-                <Button>
+                <Button Click="SettingsButton_OnClick">
                     <TextBlock FontFamily="Segoe MDL2 Assets"
                                Text="&#xE713;" FontSize="25"
                                Opacity="0.6" />
@@ -134,11 +133,15 @@
                                Text="&#xE74B;" FontSize="25"
                                Opacity="0.6" />
                 </Button>
-                <Button Grid.Row="5" Command="{x:Bind ViewModel.CancelCommand, Mode=OneWay}">
+                <Button Grid.Row="5" Command="{x:Bind ViewModel.CancelCommand, Mode=OneWay}" x:Name="CancelButton">
                     <TextBlock FontFamily="Segoe MDL2 Assets"
                                Text="&#xE711;" FontSize="25"
                                Opacity="0.6" />
                 </Button>
+                <TeachingTip  Title="You can cancel downloading by this button."
+                               IsOpen="{x:Bind ViewModel.IsCancelTipVisible, Mode=TwoWay}"
+                                PreferredPlacement="Right"
+                                Target="{Binding ElementName=CancelButton}" />
             </Grid>
 
             <!-- Загрузка. -->

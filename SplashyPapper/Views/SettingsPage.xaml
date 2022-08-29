@@ -1,0 +1,44 @@
+﻿<Page
+    x:Class="SplashyPapper.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:SplashyPapper.Views"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="Transparent">
+
+    <Grid Background="#90000000">
+        <Grid Height="500" Width="600"
+              BorderBrush="#878787"
+              CornerRadius="15"
+              BorderThickness="3"
+              Background="#da232323">
+            <StackPanel Padding="30" Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Margin="0 0 0 50">
+                <NumberBox Text="{x:Bind ViewModel.DownloadTimeout, Mode=TwoWay}"
+                           SmallChange="1"
+                           PlaceholderText="25"
+                           Header="Download timeout:"
+                           Width="250"
+                           SpinButtonPlacementMode="Inline"
+                           LargeChange="5"></NumberBox>
+
+                <ToggleSwitch HorizontalAlignment="Left"
+                                  Header="Auto download next image:"
+                                  VerticalAlignment="Center"
+                                  IsOn="{x:Bind ViewModel.AutoLoadNext, Mode=TwoWay}" />
+                <ToggleSwitch HorizontalAlignment="Left"
+                              Header="Always show gallery"
+                              VerticalAlignment="Center"
+                              IsOn="{x:Bind ViewModel.IsAlwaysShowGallery, Mode=TwoWay}" />
+            </StackPanel>
+            <Button VerticalAlignment="Bottom"
+                    HorizontalAlignment="Center"
+                    Margin="0 20"
+                    Click="ButtonBase_OnClick"
+                    Content="Save and close">
+            </Button>
+        </Grid>
+    </Grid>
+</Page>
